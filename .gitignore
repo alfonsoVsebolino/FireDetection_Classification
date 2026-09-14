@@ -1,0 +1,5 @@
+/.pytest_cache
+/.agents
+/Data_Preprocessed
+*.md
+Data_Preprocessed.zip

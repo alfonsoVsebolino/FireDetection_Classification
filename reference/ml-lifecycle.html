@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ML Lifecycle Reference &amp; Tutorial &mdash; Fire &amp; Smoke Classification</title>
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div id="app-container">
+
+  <!-- ================================================================= -->
+  <!-- SIDEBAR NAVIGATION                                                -->
+  <!-- ================================================================= -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-badge">ML Lifecycle</span>
+        <span style="font-size: 13px; color: #94a3b8; font-weight: 600;">Fire &amp; Smoke</span>
+      </div>
+      <h1 class="sidebar-title">Architecture &amp; Tutorial</h1>
+      <p class="sidebar-subtitle">Workspace Design &amp; Model Selection Guide</p>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-phase="1">
+        <span class="nav-pill">1</span>
+        <span>Data &amp; Leakage Prevention</span>
+      </a>
+      <a class="nav-item" data-phase="2">
+        <span class="nav-pill">2</span>
+        <span>Feature Extraction Engine</span>
+      </a>
+      <a class="nav-item" data-phase="3">
+        <span class="nav-pill">3</span>
+        <span>Tier 1: LightGBM Baseline</span>
+      </a>
+      <a class="nav-item" data-phase="4">
+        <span class="nav-pill">4</span>
+        <span>Tier 2: ResNet18 CNN Anchor</span>
+      </a>
+      <a class="nav-item" data-phase="5">
+        <span class="nav-pill">5</span>
+        <span>Tier 3: DeiT-Tiny Transformer</span>
+      </a>
+      <a class="nav-item" data-phase="6">
+        <span class="nav-pill">6</span>
+        <span>Decision Calibration (&theta;*)</span>
+      </a>
+      <a class="nav-item" data-phase="7">
+        <span class="nav-pill">7</span>
+        <span>Latency &amp; Champion Selection</span>
+      </a>
+      <a class="nav-item" data-phase="8">
+        <span class="nav-pill">8</span>
+        <span>Real-World Dual-Gate Serving</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- ================================================================= -->
+  <!-- MAIN CONTENT AREA                                                 -->
+  <!-- ================================================================= -->
+  <main id="main-content">
+
+    <!-- Top Stepper Bar -->
+    <header class="stepper-bar-container">
+      <div class="stepper-track">
+        <div class="step-node active" data-phase="1">
+          <div class="step-circle">1</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-node" data-phase="2">
+          <div class="step-circle">2</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-node" data-phase="3">
+          <div class="step-circle">3</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-node" data-phase="4">
+          <div class="step-circle">4</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-node" data-phase="5">
+          <div class="step-circle">5</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-node" data-phase="6">
+          <div class="step-circle">6</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-node" data-phase="7">
+          <div class="step-circle">7</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-node" data-phase="8">
+          <div class="step-circle">8</div>
+        </div>
+      </div>
+
+      <div class="stepper-nav-buttons">
+        <button id="btn-prev" class="btn btn-secondary" disabled>&larr; Previous</button>
+        <button id="btn-next" class="btn btn-primary">Next Phase &rarr;</button>
+      </div>
+    </header>
+
+    <div class="content-wrapper">
+
+      <!-- ============================================================= -->
+      <!-- PHASE 1: DATA INGESTION & SPLIT HYGIENE                       -->
+      <!-- ============================================================= -->
+      <section id="phase-1" class="phase-container active">
+        <div class="phase-header">
+          <span class="phase-tag">Phase 1 &bull; Ingestion &amp; Integrity</span>
+          <h2 class="phase-title">Dataset Ingestion &amp; Leak-Free Splitting</h2>
+          <p class="phase-lead">
+            Data hygiene is the foundational determinant of model generalization. This phase enforces exact perceptual deduplication, corruption pruning, and strict data leakage prevention between training and evaluation splits.
+          </p>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Workspace Implementation File</div>
+          <div class="callout-body">
+            <code>src/data/pipeline.py</code> &mdash; Implements <code>FireSmokeDataset</code>, <code>get_dataloaders()</code>, DCT-based perceptual hashing, and PyTorch batch collation.
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--text-primary);">Why This Component Exists</h3>
+          <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+            Raw internet/surveillance datasets frequently suffer from repeated frames (burst captures) and corrupt headers. In this repository, the initial exploratory notebook (<code>unstructured_eda_and_feature_engineering.ipynb</code>) only cleaned and augmented the training split. If evaluation splits (<code>validation</code>, <code>test</code>) are left uncleaned, near-duplicate images across train and test artificially inflate accuracy by 8&ndash;15% (data leakage).
+          </p>
+          <p style="font-size: 14px; color: var(--text-secondary);">
+            <strong>Invariant Rule:</strong> Synthetic oversampling (rotations, blurs, color jitter) is strictly confined to <code>train</code>. Validation and test sets must reflect the authentic natural test distribution.
+          </p>
+        </div>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>src/data/pipeline.py &mdash; Deduplication &amp; Collation Snippet</span>
+            <button class="copy-btn">Copy</button>
+          </div>
+          <pre><code># Perceptual hash (DCT) deduplication with Hamming distance <= 4
+def hamming_distance(h1: str, h2: str) -> int:
+    return bin(int(h1, 16) ^ int(h2, 16)).count('1')
+
+# Evaluation transforms: 224x224 LANCZOS RGB + ImageNet Normalization
+def get_eval_transforms():
+    return transforms.Compose([
+        transforms.Resize((224, 224), interpolation=InterpolationMode.LANCZOS),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])</code></pre>
+        </div>
+
+        <h3 style="margin-top: 32px; font-size: 17px;">User-Tunable Hyperparameters</h3>
+        <div class="param-grid">
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">hamming_threshold</span>
+              <span class="param-badge critical">Integrity</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>4</span></div>
+              <div class="param-meta-item">Range: <span>[0, 8]</span></div>
+            </div>
+            <p class="param-desc">
+              Bitwise Hamming distance threshold for 64-bit pHash deduplication. Values &le; 4 aggressively drop near-identical video frames; values &ge; 8 risk dropping distinct fires with similar horizon angles.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">batch_size</span>
+              <span class="param-badge">Hardware</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>16 (CPU) / 32 (GPU)</span></div>
+              <div class="param-meta-item">Range: <span>[8, 64]</span></div>
+            </div>
+            <p class="param-desc">
+              Mini-batch sample count per optimizer step. CPU memory bandwidth constraints make 16 optimal on laptops; remote Colab GPUs can safely scale to 32 or 64.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">num_workers</span>
+              <span class="param-badge">Hardware</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>0 (CPU) / 2 (Colab)</span></div>
+              <div class="param-meta-item">Range: <span>[0, 4]</span></div>
+            </div>
+            <p class="param-desc">
+              Subprocess count for asynchronous data loading. Set to 0 on local machines to avoid shared-memory IPC bottlenecks; set to 2 on Linux/Colab.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 2: HANDCRAFTED FEATURE EXTRACTION                       -->
+      <!-- ============================================================= -->
+      <section id="phase-2" class="phase-container">
+        <div class="phase-header">
+          <span class="phase-tag">Phase 2 &bull; Feature Engineering</span>
+          <h2 class="phase-title">Handcrafted Color &amp; Texture Descriptors</h2>
+          <p class="phase-lead">
+            Before deploying compute-heavy neural networks, extracting physically interpretable colorimetric and textural descriptors establishes an explainable baseline.
+          </p>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Workspace Implementation File</div>
+          <div class="callout-body">
+            <code>src/features/extract.py</code> &mdash; Implements RGB/HSV color histogram bins, statistical color moments (mean, std, skew), and texture gradient statistics.
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--text-primary);">Physical Domain Justification</h3>
+          <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+            Active flames emit high-luminance Planckian radiation with characteristic spectral signatures in high-red, high-yellow HSV hues. Conversely, smoke plumes manifest as desaturated, diffuse low-saturation distributions with high local texture variance and edge dissipation.
+          </p>
+          <ul style="font-size: 14px; color: var(--text-secondary); margin-left: 20px; line-height: 1.8;">
+            <li><strong>96-Bin Histograms:</strong> 16 bins across R, G, B channels and H, S, V channels capture global chromatic shifts.</li>
+            <li><strong>9 Color Moments:</strong> First three central statistical moments (Mean, Standard Deviation, Skewness) per channel capture distribution asymmetry.</li>
+            <li><strong>Texture Descriptors:</strong> Sobel gradient variance measures edge sharpness (crisp flame boundaries vs. soft smoke dissipation).</li>
+          </ul>
+        </div>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>src/features/extract.py &mdash; Feature Vector Assembly</span>
+            <button class="copy-btn">Copy</button>
+          </div>
+          <pre><code>def extract_all_features(image_input) -> np.ndarray:
+    # Concatenates:
+    # 1. 96-dim Color Histograms (RGB + HSV)
+    # 2. 9-dim Color Moments (Mean, Std, Skew per channel)
+    # 3. 4-dim Texture Gradient Statistics (Sobel magnitude mean/var)
+    hist_feats = extract_color_histogram(image_input, bins_per_channel=16)
+    moment_feats = extract_color_moments(image_input)
+    texture_feats = extract_texture_features(image_input)
+    return np.concatenate([hist_feats, moment_feats, texture_feats]).astype(np.float32)</code></pre>
+        </div>
+
+        <h3 style="margin-top: 32px; font-size: 17px;">User-Tunable Hyperparameters</h3>
+        <div class="param-grid">
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">bins_per_channel</span>
+              <span class="param-badge">Resolution</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>16</span></div>
+              <div class="param-meta-item">Range: <span>[8, 32]</span></div>
+            </div>
+            <p class="param-desc">
+              Histogram quantization bins per color channel. 16 bins balance chromatic resolution (16 &times; 6 = 96 features) against curse of dimensionality in tree splits.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">include_texture</span>
+              <span class="param-badge">Ablation</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>True</span></div>
+              <div class="param-meta-item">Range: <span>[True, False]</span></div>
+            </div>
+            <p class="param-desc">
+              Enables spatial edge filtering. Essential for distinguishing homogeneous sunlight/amber lighting from high-entropy turbulent flame perimeters.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 3: TIER 1 CLASSICAL LIGHTGBM BASELINE                   -->
+      <!-- ============================================================= -->
+      <section id="phase-3" class="phase-container">
+        <div class="phase-header">
+          <span class="phase-tag">Phase 3 &bull; Tier 1 Baseline</span>
+          <h2 class="phase-title">Gradient Boosted Decision Trees (LightGBM)</h2>
+          <p class="phase-lead">
+            The non-deep champion candidate: ultra-fast CPU training (&lt; 60s), zero GPU requirement, highly interpretable decision splits, and instant feature importances.
+          </p>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Workspace Implementation File</div>
+          <div class="callout-body">
+            <code>src/models/train_lightgbm.py</code> &mdash; Implements tabular dataset vectorization, loss-penalized gradient boosting, and native booster artifact serialization.
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--text-primary);">Why We Include a Classical Baseline</h3>
+          <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+            In industrial IoT and edge surveillance, deep neural networks often incur unacceptable battery drain and latency. If an engineered feature vector fed into LightGBM can achieve 88% Fire Recall with 2.5ms inference latency, it represents a compelling candidate for low-power edge microcontrollers.
+          </p>
+          <div class="callout danger">
+            <div class="callout-title">False Negative Penalty Implementation</div>
+            <div class="callout-body">
+              Configured with <code>class_weight={0: 2.0, 1: 1.0}</code>. Class 0 (Fire) carries double sample weight during histogram binning, forcing leaf splits that prioritize Fire Recall.
+            </div>
+          </div>
+        </div>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>src/models/train_lightgbm.py &mdash; Configuration Snippet</span>
+            <button class="copy-btn">Copy</button>
+          </div>
+          <pre><code>model = LGBMClassifier(
+    objective="binary",
+    n_estimators=200,
+    learning_rate=0.05,
+    max_depth=6,
+    num_leaves=31,
+    class_weight={0: 2.0, 1: 1.0},  # Heavy penalty on Fire False Negatives
+    random_state=42,
+    n_jobs=-1
+)</code></pre>
+        </div>
+
+        <h3 style="margin-top: 32px; font-size: 17px;">User-Tunable Hyperparameters</h3>
+        <div class="param-grid">
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">class_weight (fire_weight)</span>
+              <span class="param-badge critical">Safety</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>{0: 2.0, 1: 1.0}</span></div>
+              <div class="param-meta-item">Range: <span>[1.0, 5.0]</span></div>
+            </div>
+            <p class="param-desc">
+              Multiplier for positive fire class gradients. Higher values penalize missed fires heavily, raising Fire Recall at the expense of precision on smoke plumes.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">learning_rate</span>
+              <span class="param-badge">Optimization</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>0.05</span></div>
+              <div class="param-meta-item">Range: <span>[0.01, 0.2]</span></div>
+            </div>
+            <p class="param-desc">
+              Shrinkage factor per boosting iteration. Lower values (0.01) prevent overfitting on small datasets but require larger <code>n_estimators</code>.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">num_leaves</span>
+              <span class="param-badge">Capacity</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>31</span></div>
+              <div class="param-meta-item">Range: <span>[15, 63]</span></div>
+            </div>
+            <p class="param-desc">
+              Main tree complexity controller. In LightGBM (leaf-wise tree growth), <code>num_leaves</code> must be &lt; 2<sup>max_depth</sup> to avoid deep unregularized splits.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 4: TIER 2 RESNET18 CNN ANCHOR                           -->
+      <!-- ============================================================= -->
+      <section id="phase-4" class="phase-container">
+        <div class="phase-header">
+          <span class="phase-tag">Phase 4 &bull; Tier 2 Deep CNN</span>
+          <h2 class="phase-title">ResNet18 Transfer Learning Backbone</h2>
+          <p class="phase-lead">
+            The spatial visual pattern anchor: leverages deep ImageNet hierarchical feature representations with selective layer freezing and asymmetric Cross-Entropy loss.
+          </p>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Workspace Implementation File</div>
+          <div class="callout-body">
+            <code>src/models/train_resnet.py</code> &mdash; Implements <code>build_resnet18()</code>, layer freeze masking, weighted CrossEntropy loss, and early-stopping epoch loops.
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--text-primary);">Freezing Strategy &amp; Architecture Customization</h3>
+          <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+            Training 11.2M parameters from scratch on small hazard datasets causes severe overfitting. We freeze the lower convolutional layers (<code>conv1</code>, <code>bn1</code>, <code>layer1</code>), preserving generic low-level Gabor filters (edges, gradients), while fine-tuning <code>layer2</code>, <code>layer3</code>, <code>layer4</code>, and replacing <code>model.fc</code> with:
+          </p>
+          <div style="text-align: center; margin: 16px 0;">
+            <code style="background-color: var(--bg-primary); padding: 8px 16px; border-radius: 6px; font-size: 13px;">
+              Linear(512, 512) &rarr; Dropout(p=0.3) &rarr; Linear(512, 2)
+            </code>
+          </div>
+        </div>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>src/models/train_resnet.py &mdash; Architecture &amp; Loss</span>
+            <button class="copy-btn">Copy</button>
+          </div>
+          <pre><code>def build_resnet18(pretrained: bool = True, num_classes: int = 2) -> nn.Module:
+    weights = ResNet18_Weights.DEFAULT if pretrained else None
+    model = models.resnet18(weights=weights)
+
+    # Freeze low-level feature extractors
+    for name, param in model.named_parameters():
+        if name.startswith(("conv1", "bn1", "layer1")):
+            param.requires_grad = False
+
+    # Custom classification head with dropout regularization
+    model.fc = nn.Sequential(nn.Dropout(p=0.3), nn.Linear(512, num_classes))
+    return model
+
+# Asymmetric CrossEntropy: w=[2.0, 1.0] penalizes missed fire
+criterion = nn.CrossEntropyLoss(weight=torch.tensor([2.0, 1.0]))</code></pre>
+        </div>
+
+        <h3 style="margin-top: 32px; font-size: 17px;">User-Tunable Hyperparameters</h3>
+        <div class="param-grid">
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">lr (learning rate)</span>
+              <span class="param-badge">Convergence</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>1e-4</span></div>
+              <div class="param-meta-item">Range: <span>[1e-5, 5e-4]</span></div>
+            </div>
+            <p class="param-desc">
+              Base learning rate for AdamW. High learning rates (&gt; 1e-3) corrupt pretrained feature extractors in un-frozen layers; 1e-4 provides stable convergence.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">fire_weight</span>
+              <span class="param-badge critical">Safety</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>2.0</span></div>
+              <div class="param-meta-item">Range: <span>[1.5, 4.0]</span></div>
+            </div>
+            <p class="param-desc">
+              Weight assigned to Class 0 in <code>nn.CrossEntropyLoss</code>. Directly amplifies backpropagation gradients for false negative fire samples.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">dropout</span>
+              <span class="param-badge">Regularization</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>0.3</span></div>
+              <div class="param-meta-item">Range: <span>[0.1, 0.5]</span></div>
+            </div>
+            <p class="param-desc">
+              Probability of zeroing hidden units in the FC head before the 2-class projection. Prevents co-adaptation of features on small batches.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 5: TIER 3 DEIT-TINY VISION TRANSFORMER                  -->
+      <!-- ============================================================= -->
+      <section id="phase-5" class="phase-container">
+        <div class="phase-header">
+          <span class="phase-tag">Phase 5 &bull; Tier 3 Vision Transformer</span>
+          <h2 class="phase-title">DeiT-Tiny Self-Attention Architecture</h2>
+          <p class="phase-lead">
+            Global context via multi-head self-attention: evaluates non-local visual relationships (smoke dispersion plumes vs. focal fire patches) using a lightweight 5.7M parameter transformer.
+          </p>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Workspace Implementation File</div>
+          <div class="callout-body">
+            <code>src/models/train_vit.py</code> &mdash; Implements <code>build_deit_tiny()</code> via <code>timm</code>, patch embedding freeze, and gradient accumulation.
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--text-primary);">Why Include a Vision Transformer?</h3>
+          <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+            Standard CNN convolutions operate over small local receptive fields (3 &times; 3 or 7 &times; 7), struggling to connect thin smoke plumes spanning across large scene horizons with distant burning brush. DeiT-Tiny computes pairwise patch attention across all 14 &times; 14 = 196 patches in layer 1.
+          </p>
+          <p style="font-size: 14px; color: var(--text-secondary);">
+            <strong>Efficiency Optimization:</strong> We freeze <code>patch_embed</code> and transformer blocks 0&ndash;5, training only blocks 6&ndash;11 and the classification head. Gradient accumulation (<code>accum_steps=2</code>) allows achieving an effective batch size of 32 on memory-constrained hardware.
+          </p>
+        </div>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>src/models/train_vit.py &mdash; Transformer Layer Freezing</span>
+            <button class="copy-btn">Copy</button>
+          </div>
+          <pre><code>def build_deit_tiny(pretrained: bool = True, num_classes: int = 2) -> nn.Module:
+    model = timm.create_model("deit_tiny_patch16_224", pretrained=pretrained, num_classes=num_classes)
+
+    # Freeze patch embedding and first 6 transformer self-attention blocks
+    for param in model.patch_embed.parameters():
+        param.requires_grad = False
+    for block in model.blocks[:6]:
+        for param in block.parameters():
+            param.requires_grad = False
+
+    return model</code></pre>
+        </div>
+
+        <h3 style="margin-top: 32px; font-size: 17px;">User-Tunable Hyperparameters</h3>
+        <div class="param-grid">
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">accum_steps</span>
+              <span class="param-badge">Memory</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>2</span></div>
+              <div class="param-meta-item">Range: <span>[1, 4]</span></div>
+            </div>
+            <p class="param-desc">
+              Number of mini-batches over which gradients accumulate before <code>optimizer.step()</code>. Simulates batch size 32 with batch size 16 memory footprint.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">lr (Transformer)</span>
+              <span class="param-badge">Stability</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>5e-5</span></div>
+              <div class="param-meta-item">Range: <span>[2e-5, 1e-4]</span></div>
+            </div>
+            <p class="param-desc">
+              Vision Transformers lack inductive biases (translation equivariance) and require lower learning rates than CNNs to avoid attention head divergence.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 6: DECISION THRESHOLD CALIBRATION                       -->
+      <!-- ============================================================= -->
+      <section id="phase-6" class="phase-container">
+        <div class="phase-header">
+          <span class="phase-tag">Phase 6 &bull; Safety Calibration</span>
+          <h2 class="phase-title">Validation Decision Boundary Sweep (&theta;*)</h2>
+          <p class="phase-lead">
+            Standard classifiers default to a symmetric 0.50 probability threshold. In hazard detection, we post-process the validation PR curve to calibrate an operational threshold &theta;* strictly satisfying the 90% Fire Recall mandate.
+          </p>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Workspace Implementation File</div>
+          <div class="callout-body">
+            <code>src/evaluate/calibrate.py</code> &mdash; Sweeps decision boundary &theta; &isin; [0.10, 0.90] with step 0.02, maximizing precision subject to Recall<sub>fire</sub> &ge; 0.90.
+          </div>
+        </div>
+
+        <!-- Interactive Simulator 1 -->
+        <div class="sim-container">
+          <div class="sim-header">
+            <div class="sim-title">
+              <span>&#9881;</span>
+              <span>Interactive Decision Threshold Calibration Simulator</span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+              Drag the threshold slider to observe the trade-off between Fire Recall and Precision. Observe how lowering &theta; guarantees safety by eliminating False Negatives.
+            </p>
+          </div>
+
+          <div class="sim-controls">
+            <div class="sim-slider-group">
+              <div class="sim-slider-label">
+                <span>Operational Decision Threshold (&theta;)</span>
+                <span id="sim-theta-val" class="sim-slider-val">0.38</span>
+              </div>
+              <input id="sim-theta-slider" type="range" min="0.10" max="0.90" step="0.02" value="0.38">
+              <span style="font-size: 11px; color: var(--text-muted);">Triggers Fire classification whenever <em>P</em>(fire) &ge; &theta;</span>
+            </div>
+          </div>
+
+          <div class="sim-display">
+            <div class="sim-stat-box">
+              <div class="sim-stat-title">Fire Recall (Sensitivity)</div>
+              <div id="sim-recall-val" class="sim-stat-value ok">92.4%</div>
+            </div>
+            <div class="sim-stat-box">
+              <div class="sim-stat-title">Fire Precision</div>
+              <div id="sim-prec-val" class="sim-stat-value ok">88.1%</div>
+            </div>
+            <div class="sim-stat-box">
+              <div class="sim-stat-title">Macro F1 Score</div>
+              <div id="sim-f1-val" class="sim-stat-value ok">90.2%</div>
+            </div>
+          </div>
+
+          <div id="sim-threshold-verdict" class="sim-verdict-box">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <h3 style="margin-top: 32px; font-size: 17px;">User-Tunable Hyperparameters</h3>
+        <div class="param-grid">
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">min_recall</span>
+              <span class="param-badge critical">Safety Contract</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>0.90</span></div>
+              <div class="param-meta-item">Range: <span>[0.85, 0.98]</span></div>
+            </div>
+            <p class="param-desc">
+              Mandatory minimum fire recall on validation split. Any threshold candidate yielding recall below this value is rejected regardless of precision.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">sweep_step</span>
+              <span class="param-badge">Granularity</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>0.02</span></div>
+              <div class="param-meta-item">Range: <span>[0.01, 0.05]</span></div>
+            </div>
+            <p class="param-desc">
+              Step size across the probability spectrum [0.10, 0.90]. Finer steps (0.01) yield exact boundary calibration on large validation sets.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 7: BENCHMARKING & CHAMPION SELECTION                    -->
+      <!-- ============================================================= -->
+      <section id="phase-7" class="phase-container">
+        <div class="phase-header">
+          <span class="phase-tag">Phase 7 &bull; Governance &amp; Selection</span>
+          <h2 class="phase-title">Latency Profiling &amp; Champion Model Selection</h2>
+          <p class="phase-lead">
+            Governing model deployment through objective constraints: disqualify candidates failing safety constraints, benchmark single-sample CPU latency, and serialize runtime metadata.
+          </p>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Workspace Implementation File</div>
+          <div class="callout-body">
+            <code>src/evaluate/benchmark.py</code> &mdash; Implements <code>benchmark_model_cpu()</code> over 100 iterations, <code>select_champion()</code>, and exports <code>champion_config.json</code>.
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="font-size: 16px; margin-bottom: 12px; color: var(--text-primary);">Champion Governance Decision Tree</h3>
+          <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
+            The winning model is never chosen based on aggregate accuracy alone. The selection policy executes a strict two-stage filter:
+          </p>
+          <ol style="font-size: 14px; color: var(--text-secondary); margin-left: 20px; line-height: 1.8;">
+            <li><strong>Hard Safety Filter:</strong> If Recall<sub>fire</sub>(test) &lt; 0.90, the candidate is automatically disqualified (unacceptable hazard risk).</li>
+            <li><strong>Latency Minimization:</strong> Among all qualifying architectures meeting Filter 1, select the model with the minimum single-sample CPU inference latency (<em>T</em><sub>single</sub> in ms).</li>
+          </ol>
+        </div>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>models/champion_config.json &mdash; Export Schema</span>
+            <button class="copy-btn">Copy</button>
+          </div>
+          <pre><code>{
+  "champion_tier": "Tier2_ResNet18",
+  "architecture": "resnet18",
+  "model_path": "models/tier2_resnet18_best.pt",
+  "test_recall_fire": 0.942,
+  "calibrated_threshold": 0.38,
+  "latency_ms": 28.4,
+  "timestamp": "2026-09-13T13:54:00Z"
+}</code></pre>
+        </div>
+      </section>
+
+      <!-- ============================================================= -->
+      <!-- PHASE 8: REAL-WORLD DUAL-GATE INGESTION & SERVING             -->
+      <!-- ============================================================= -->
+      <section id="phase-8" class="phase-container">
+        <div class="phase-header">
+          <span class="phase-tag">Phase 8 &bull; Production Serving</span>
+          <h2 class="phase-title">Real-World Ingestion &amp; Dual-Gate Engine</h2>
+          <p class="phase-lead">
+            Bridging closed-set dataset training and open-world surveillance: real camera feeds contain ambient backgrounds without fire or smoke. Dual-gating rejects normal frames before evaluating hazard boundaries.
+          </p>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Workspace Implementation File</div>
+          <div class="callout-body">
+            <code>src/inference.py</code> &mdash; Implements <code>FireClassifier</code> class and CLI accepting single paths, batch directories, or raw frame streams.
+          </div>
+        </div>
+
+        <!-- Interactive Simulator 2 -->
+        <div class="sim-container">
+          <div class="sim-header">
+            <div class="sim-title">
+              <span>&#128269;</span>
+              <span>Dual-Gate Real-World Ingestion Simulator</span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+              Adjust predicted class probabilities and the ambient rejection threshold &tau; to test how camera feeds are handled.
+            </p>
+          </div>
+
+          <div class="sim-controls">
+            <div class="sim-slider-group">
+              <div class="sim-slider-label">
+                <span>Model Softmax P(fire)</span>
+                <span id="sim-gate-fire-val" class="sim-slider-val">0.55</span>
+              </div>
+              <input id="sim-gate-fire" type="range" min="0.00" max="1.00" step="0.01" value="0.55">
+
+              <div class="sim-slider-label" style="margin-top: 12px;">
+                <span>Model Softmax P(smoke)</span>
+                <span id="sim-gate-smoke-val" class="sim-slider-val">0.45</span>
+              </div>
+              <input id="sim-gate-smoke" type="range" min="0.00" max="1.00" step="0.01" value="0.45">
+            </div>
+
+            <div class="sim-slider-group">
+              <div class="sim-slider-label">
+                <span>Ambient Rejection Gate (&tau;)</span>
+                <span id="sim-gate-tau-val" class="sim-slider-val">0.70</span>
+              </div>
+              <input id="sim-gate-tau" type="range" min="0.50" max="0.95" step="0.01" value="0.70">
+              <span style="font-size: 11px; color: var(--text-muted);">Requires max(<em>P</em>) &ge; &tau; to confirm hazard presence; else rejects as ambient frame.</span>
+            </div>
+          </div>
+
+          <div class="sim-display">
+            <div class="sim-stat-box">
+              <div class="sim-stat-title">Gate 1: Ambient Check</div>
+              <div id="sim-gate1-status" class="sim-stat-value ok">PASSED</div>
+            </div>
+            <div class="sim-stat-box">
+              <div class="sim-stat-title">Gate 2: Hazard Decider</div>
+              <div id="sim-gate2-status" class="sim-stat-value danger">FIRE</div>
+            </div>
+          </div>
+
+          <div id="sim-final-decision" class="sim-verdict-box" style="margin-top: 20px;">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <h3 style="margin-top: 32px; font-size: 17px;">User-Tunable Hyperparameters</h3>
+        <div class="param-grid">
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">&tau; (ambient threshold)</span>
+              <span class="param-badge critical">Gate 1</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">Default: <span>0.70</span></div>
+              <div class="param-meta-item">Range: <span>[0.60, 0.85]</span></div>
+            </div>
+            <p class="param-desc">
+              Minimum maximum softmax confidence required to classify an image as a hazard. If max(<em>P</em>(fire), <em>P</em>(smoke)) &lt; &tau;, the frame is classified as <code>ambient_frame</code>, suppressing false alarms on everyday background scenes.
+            </p>
+          </div>
+
+          <div class="param-card">
+            <div class="param-header">
+              <span class="param-name">&theta;* (calibrated boundary)</span>
+              <span class="param-badge critical">Gate 2</span>
+            </div>
+            <div class="param-meta">
+              <div class="param-meta-item">From: <span>Phase 6</span></div>
+              <div class="param-meta-item">Dynamic: <span>~0.38</span></div>
+            </div>
+            <p class="param-desc">
+              Calibrated operational threshold loaded from <code>champion_config.json</code>. If Gate 1 passes and <em>P</em>(fire) &ge; &theta;*, output triggers active Fire alert; else Smoke plume alert.
+            </p>
+          </div>
+        </div>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>CLI Usage Example</span>
+            <button class="copy-btn">Copy</button>
+          </div>
+          <pre><code># Execute CLI inference on single real-world image or directory
+python3 -m src.inference \
+    --input surveillance_cam_01.jpg \
+    --threshold 0.70 \
+    --output-json prediction.json \
+    --save-overlay</code></pre>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+<script src="../assets/app.js"></script>
+</body>
+</html>
