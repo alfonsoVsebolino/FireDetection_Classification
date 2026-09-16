@@ -158,6 +158,7 @@ class FireClassifier:
                 "probabilities": {"fire": p_fire, "smoke": p_smoke},
                 "latency_ms": round(latency_ms, 3),
                 "operational_threshold": self.threshold,
+                "ambient_tau": self.ambient_tau,
             }
 
         # Gate 2: Calibrated detection
@@ -175,6 +176,7 @@ class FireClassifier:
             "probabilities": {"fire": round(p_fire, 6), "smoke": round(p_smoke, 6)},
             "latency_ms": round(latency_ms, 3),
             "operational_threshold": self.threshold,
+            "ambient_tau": self.ambient_tau,
         }
 
     # Alias for test compatibility
@@ -236,14 +238,16 @@ def main() -> None:
 
     results = classifier.predict_batch(image_files)
 
+    payload = results[0] if len(results) == 1 else results
+    
     if args.output_json:
         out = Path(args.output_json)
         out.parent.mkdir(parents=True, exist_ok=True)
         with open(out, "w") as f:
-            json.dump(results if len(results) > 1 else results[0], f, indent=2)
+            json.dump(payload, f, indent = 2)
         print(f"Results written to {out}")
     else:
-        print(json.dumps(results if len(results) > 1 else results[0], indent=2))
+        print(json.dumps(payload, indent=2))
 
 
 if __name__ == "__main__":

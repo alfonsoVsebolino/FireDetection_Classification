@@ -64,8 +64,7 @@ def extract_features_from_dataset(
     for i in range(total):
         item = dataset[i]
         if isinstance(item, (tuple, list)):
-            data_elem = item[0]
-            label = int(item[1])
+            data_elem, label = item[0], int(item[1])
             if len(item) >= 3 and isinstance(item[2], (str, Path)) and os.path.isfile(str(item[2])):
                 with Image.open(str(item[2])) as im:
                     feat = extract_all_features(im)
@@ -75,7 +74,8 @@ def extract_features_from_dataset(
                 t = data_elem.detach().cpu()
                 if t.ndim == 3 and t.shape[0] in (1, 3):
                     arr = t.permute(1, 2, 0).numpy()
-                    arr = np.clip((arr - arr.min()) / (arr.max() - arr.min() + 1e-7) * 255.0, 0, 255).astype(np.uint8)
+                    val_range = arr.max() - arr.min() + 1e-7
+                    arr = np.clip((arr - arr.min()) / val_range * 255.0, 0, 255).astype(np.uint8)
                     feat = extract_all_features(arr)
                 else:
                     feat = extract_all_features(t.numpy())

@@ -62,7 +62,9 @@ def _fire_recall(preds: torch.Tensor, labels: torch.Tensor) -> float:
     fire_mask = labels == 0
     if fire_mask.sum() == 0:
         return 1.0
-    return (preds[fire_mask] == 0).sum().item() / fire_mask.sum().item()
+    total_fire = fire_mask.sum().item()
+    correct = (preds[fire_mask] == 0).sum().item()
+    return correct / total_fire
 
 
 # ---------------------------------------------------------------------------

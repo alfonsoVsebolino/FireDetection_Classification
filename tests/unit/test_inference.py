@@ -40,6 +40,7 @@ def test_fire_classifier_ambient_rejection_gate(synthetic_ambient_image):
 
     assert res["hazard_detected"] is False
     assert "ambient" in (res.get("predicted_class") or res.get("label") or res.get("status", "")).lower()
+    assert res["ambient_tau"] == 0.70
 
 
 def test_fire_classifier_fire_gate(synthetic_fire_image):
@@ -53,6 +54,7 @@ def test_fire_classifier_fire_gate(synthetic_fire_image):
 
     assert res["hazard_detected"] is True
     assert (res.get("predicted_class") or res.get("label")) == "fire"
+    assert res["ambient_tau"] == 0.70
 
 
 def test_fire_classifier_smoke_gate(synthetic_smoke_image):
@@ -66,6 +68,7 @@ def test_fire_classifier_smoke_gate(synthetic_smoke_image):
 
     assert res["hazard_detected"] is True
     assert (res.get("predicted_class") or res.get("label")) == "smoke"
+    assert res["ambient_tau"] == 0.70
 
 
 def test_inference_cli_interface(synthetic_fire_image, temp_image_dir):

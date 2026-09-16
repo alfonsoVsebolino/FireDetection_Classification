@@ -168,18 +168,29 @@ def resolve_dataset_dir(root_dir: Optional[Union[str, Path]] = None) -> Path:
     def _find_data_root(candidate: Path) -> Optional[Path]:
         if not candidate.exists():
             if candidate.parent.is_dir():
-                matches = [p for p in candidate.parent.iterdir() if p.name.lower() == candidate.name.lower()]
-                if matches:
-                    candidate = matches[0]
-                else:
+                matched = None
+                for p in candidate.parent.iterdir():
+                    if p.name.lower() == candidate.name.lower():
+                        matched = p
+                        break
+                if matched is None: 
                     return None
+                candidate = matched
             else:
                 return None
 
         if candidate.is_file() and candidate.suffix.lower() == ".zip":
-            extract_base = Path("/content") if Path("/content").is_dir() else candidate.parent
-            extracted_dirs = [p for p in extract_base.iterdir() if p.is_dir() and "data_preprocessed" in p.name.lower()]
-            has_train = any((d / "train").is_dir() or list(d.glob("**/train")) for d in extracted_dirs)
+            extract_base = Path("/content")
+            if not extract_base.is_dir():
+                extract_base = candidate.parent
+            
+            has_train = False
+            for d in extract_base.iterdir():
+                if d.is_dir() and "data_preprocessed" in d.name.lower():
+                    if (d / "train").is_dir() or next(d.glob("**/train"), None):
+                        has_train = True
+                        break
+                    
             if not has_train:
                 with zipfile.ZipFile(candidate, "r") as zf:
                     zf.extractall(extract_base)
@@ -318,11 +329,18 @@ def _get_train_hash_index(root_dir: Path, split_dir: Path) -> Optional[HammingIn
         split_dir.parent / "train",
         split_dir.parent / "training",
     ]
-    train_dir = next((c for c in train_candidates if c.is_dir() and c != split_dir), None)
+    train_dir = None
+    for c in train_candidates:
+        if c.is_dir() and c != split_dir:
+            train_dir = c
+            break
+        
     if train_dir is None:
         return None
 
-    train_img = train_dir / "images" if (train_dir / "images").is_dir() else train_dir
+    train_img = train_dir / "images"
+    if not train_img.is_dir():
+        train_img = train_dir
     fp = _get_dir_fingerprint(train_img)
     ckey = (str(train_dir.resolve()), fp)
     if ckey in _TRAIN_INDEX_CACHE:
@@ -360,10 +378,12 @@ def _get_train_hash_index(root_dir: Path, split_dir: Path) -> Optional[HammingIn
                 return None
 
         workers = min(16, (os.cpu_count() or 1) * 2)
+
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            hashes = [h for h in executor.map(_hash_worker, paths) if h is not None]
-        for h in hashes:
-            t_idx.add(h)
+            for h in executor.map(_hash_worker, paths):
+                if h is not None:
+                    t_idx.add(h)
+        
         try:
             cache_dir.mkdir(parents=True, exist_ok=True)
             with open(cache_file, "w") as f:
@@ -397,13 +417,15 @@ class FireSmokeDataset(Dataset):
         self.root_dir = resolve_dataset_dir(root_dir)
         self.split_name = split
         self.split = SPLIT_MAP.get(split.lower(), split.lower())
-        self.transform = transform if transform is not None else get_eval_transforms()
+        self.transform = transform or get_eval_transforms()
         self.filter_duplicates = filter_duplicates
         self.use_cache = use_cache
         self.cross_split_dedup = cross_split_dedup
 
         split_dir = _resolve_split_dir(self.root_dir, self.split_name)
-        img_dir = split_dir / "images" if (split_dir / "images").is_dir() else split_dir
+        img_dir = split_dir / "images"
+        if not img_dir.is_dir():
+            img_dir = split_dir
         fp = _get_dir_fingerprint(img_dir)
 
         cache_key = (str(split_dir.resolve()), self.split, filter_duplicates, fp)
@@ -418,8 +440,13 @@ class FireSmokeDataset(Dataset):
             _DATASET_CACHE[cache_key] = list(self.samples)
 
     def _load_samples(self, split_dir: Path) -> List[Tuple[Path, int]]:
-        img_dir = split_dir / "images" if (split_dir / "images").is_dir() else split_dir
-        lbl_dir = split_dir / "labels" if (split_dir / "labels").is_dir() else split_dir
+        img_dir = split_dir / "images"
+        if not img_dir.is_dir():
+            img_dir = split_dir
+        
+        lbl_dir = split_dir / "labels"
+        if not lbl_dir.is_dir():
+            lbl_dir = split_dir
 
         extensions = ("*.jpg", "*.jpeg", "*.png", "*.bmp", "*.webp", "*.JPG", "*.JPEG", "*.PNG")
         image_paths: List[Path] = []
@@ -431,11 +458,11 @@ class FireSmokeDataset(Dataset):
         local_index = HammingIndex()
 
         is_eval = self.split != "train"
-        train_index = (
-            _get_train_hash_index(self.root_dir, split_dir)
-            if (is_eval and self.filter_duplicates and self.cross_split_dedup)
-            else None
-        )
+        train_index = None
+        if is_eval and self.filter_duplicates and self.cross_split_dedup:
+            train_index = _get_train_hash_index(self.root_dir, split_dir)
+            
+            label = _parse_label(lbl_file)
 
         for p in image_paths:
             if detect_corrupted(p):
@@ -545,13 +572,18 @@ def load_raw_split(repo_path: str, split_name: str) -> List[Dict[str, Union[str,
     resolved_root = resolve_dataset_dir(repo_path)
     split_dir = _resolve_split_dir(resolved_root, split_name)
 
-    img_dir = split_dir / "images" if (split_dir / "images").is_dir() else split_dir
-    lbl_dir = split_dir / "labels" if (split_dir / "labels").is_dir() else split_dir
+    img_dir = split_dir / "images"
+    if not img_dir.is_dir():
+        img_dir = split_dir
+    
+    lbl_dir = split_dir / "labels"
+    if not split_dir.is_dir():
+        lbl_dir = split_dir
 
     records: List[Dict[str, Union[str, int]]] = []
     for img_path in sorted(img_dir.glob("*.*")):
         if img_path.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp", ".webp"):
             lbl_file = lbl_dir / f"{img_path.stem}.txt"
-            label = _parse_label(lbl_file if lbl_file.is_file() else None)
+            label = _parse_label(lbl_file)
             records.append({"image": str(img_path), "label": label})
     return records

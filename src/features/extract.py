@@ -16,9 +16,9 @@ def _to_rgb_array(img: Union[Image.Image, np.ndarray]) -> np.ndarray:
         arr = arr[:, :, :3]
     elif arr.ndim == 3 and arr.shape[2] == 1:
         arr = np.repeat(arr, 3, axis=2)
-    if np.issubdtype(arr.dtype, np.floating):
-        arr = np.clip(arr * 255.0 if arr.max() <= 1.0 else arr, 0, 255).astype(np.uint8)
-    elif arr.dtype != np.uint8:
+    if np.issubdtype(arr.dtype, np.floating) and arr.max() <= 1.0:
+        arr = arr * 255.0
+    if arr.dtype != np.uint8:
         arr = np.clip(arr, 0, 255).astype(np.uint8)
     return arr
 
@@ -26,7 +26,7 @@ def _to_rgb_array(img: Union[Image.Image, np.ndarray]) -> np.ndarray:
 def extract_color_histogram(img: np.ndarray, bins: int = 16) -> np.ndarray:
     rgb = _to_rgb_array(img)
     total_pixels = float(rgb.shape[0] * rgb.shape[1])
-    norm = total_pixels if total_pixels > 0 else 1.0
+    norm = max(total_pixels, 1.0)
 
     hists = []
     for c in range(3):
@@ -53,7 +53,9 @@ def extract_color_moments(img: np.ndarray) -> np.ndarray:
             ch = arr[:, :, c].astype(np.float64)
             mean_val = float(np.mean(ch))
             std_val = float(np.std(ch))
-            skew_val = float(np.mean(((ch - mean_val) / std_val) ** 3)) if std_val > 1e-7 else 0.0
+            skew_val - 0
+            if std_val > 1e-7:
+                skew_val = float(np.mean(((ch - mean_val) / std_val) ** 3))
             moments.extend([mean_val, std_val, skew_val])
 
     return np.array(moments, dtype=np.float32)
@@ -96,8 +98,8 @@ def extract_texture_features(img_gray: np.ndarray) -> np.ndarray:
         for i, n in enumerate(neighbors):
             lbp |= ((n >= c).astype(np.uint8) << i)
         lbp_hist, _ = np.histogram(lbp, bins=16, range=(0, 256))
-        total = float(c.size)
-        lbp_norm = lbp_hist.astype(np.float32) / (total if total > 0 else 1.0)
+        total = max(float(c.size), 1.0)
+        lbp_norm = lbp_hist.astype(np.float32) / total
     else:
         lbp_norm = np.zeros(16, dtype=np.float32)
 

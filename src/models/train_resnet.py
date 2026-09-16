@@ -23,7 +23,9 @@ def build_resnet18(pretrained: bool = True, num_classes: int = 2) -> nn.Module:
     Trainable: layer2, layer3, layer4, fc.
     Head: Dropout(0.3) → Linear(512, num_classes).
     """
-    weights = ResNet18_Weights.DEFAULT if pretrained else None
+    weights = None
+    if pretrained:
+        weights = ResNet18_Weights.DEFAULT
     model = models.resnet18(weights=weights)
 
     # Freeze conv1, bn1, layer1

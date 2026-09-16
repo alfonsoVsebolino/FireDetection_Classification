@@ -50,7 +50,9 @@ def benchmark_pytorch_cpu(
 
     model_cpu = model.to(torch.device("cpu")).eval()
     latencies: list[float] = []
-    total = len(dataset) if max_samples is None else min(len(dataset), max_samples)
+    total = len(dataset)
+    if max_samples is not None:
+        total = min(total, max_samples)
 
     with torch.no_grad():
         for i in range(total):
@@ -79,7 +81,9 @@ def benchmark_lightgbm_cpu(
     max_samples: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Profile LightGBM single-sample CPU latency: both raw model and end-to-end."""
-    total = len(dataset) if max_samples is None else min(len(dataset), max_samples)
+    total = len(dataset)
+    if max_samples is not None:
+        total = min(total, max_samples)
 
     # 1. Raw tabular model inference latency
     raw_latencies: list[float] = []
@@ -93,7 +97,9 @@ def benchmark_lightgbm_cpu(
     e2e_latencies: list[float] = []
     for i in range(total):
         item = dataset[i]
-        path = item[2] if len(item) >= 3 else None
+        path = None
+        if len(item) >= 3:
+            path = item[2]
         t0 = time.perf_counter()
         if path and os.path.isfile(str(path)):
             with Image.open(str(path)) as im:

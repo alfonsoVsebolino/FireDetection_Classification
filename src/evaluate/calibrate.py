@@ -38,9 +38,7 @@ def calibrate_threshold(
     best_metrics: Dict[str, float] = {}
 
     for theta in thresholds:
-        preds = (y_probs_fire >= theta).astype(int)  # 1=fire when prob >= theta
-        # class 0 = fire → predicted fire when y_probs_fire >= theta
-        preds_binary = np.where(preds == 1, 0, 1)  # 0=fire, 1=smoke
+        preds_binary = np.where(y_probs_fire >= theta, 0, 1)
 
         fire_mask = y_true == 0
         tp = int(((preds_binary == 0) & fire_mask).sum())

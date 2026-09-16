@@ -72,9 +72,9 @@ def select_champion(
     }
 
     if not qualifying:
+        recalls = {n: m.get("test_recall_fire") for n, m in models_dict.items()}
         raise ValueError(
-            f"No model meets Fire Recall >= {recall_threshold}. "
-            f"Recalls: { {n: m.get('test_recall_fire') for n, m in models_dict.items()} }"
+            f"No model meets Fire Recall >= {recall_threshold}. Recalls: {recalls}"
         )
 
     champion_name = min(qualifying, key=lambda n: qualifying[n].get("latency_ms", float("inf")))
