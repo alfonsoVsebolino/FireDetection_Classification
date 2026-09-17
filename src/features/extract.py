@@ -53,7 +53,7 @@ def extract_color_moments(img: np.ndarray) -> np.ndarray:
             ch = arr[:, :, c].astype(np.float64)
             mean_val = float(np.mean(ch))
             std_val = float(np.std(ch))
-            skew_val - 0
+            skew_val = 0.0
             if std_val > 1e-7:
                 skew_val = float(np.mean(((ch - mean_val) / std_val) ** 3))
             moments.extend([mean_val, std_val, skew_val])

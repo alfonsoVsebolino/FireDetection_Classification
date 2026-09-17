@@ -4,8 +4,11 @@ from __future__ import annotations
 import json
 import os
 import time
+import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
+
+warnings.filterwarnings("ignore", category=UserWarning, message=".*valid feature names.*")
 
 import matplotlib.pyplot as plt
 import numpy as np

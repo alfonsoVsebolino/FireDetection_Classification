@@ -131,10 +131,14 @@ def load_saved_tier_models(
         m_vit.load_state_dict(torch.load(str(p_vit), map_location=device))
         tier_models["Tier3_DeiT_Tiny"] = m_vit.to(device).eval()
 
-    for p_lgb in [mdir / "tier1_lightgbm.pkl", mdir / "tier1_lightgbm.joblib"]:
+    for p_lgb in [mdir / "tier1_lightgbm.txt", mdir / "tier1_lightgbm.pkl", mdir / "tier1_lightgbm.joblib"]:
         if p_lgb.exists():
-            import joblib
-            tier_models["Tier1_LightGBM"] = joblib.load(str(p_lgb))
+            if p_lgb.suffix == ".txt":
+                import lightgbm as lgb
+                tier_models["Tier1_LightGBM"] = lgb.Booster(model_file=str(p_lgb))
+            else:
+                import joblib
+                tier_models["Tier1_LightGBM"] = joblib.load(str(p_lgb))
             break
 
     return tier_models, models_dict, champion_tier
@@ -147,14 +151,10 @@ def render_inference_widget(
     models_dir: str = "models",
     device: str = "cpu",
 ) -> widgets.VBox:
-    if not tier_models:
-        disk_models, disk_dict, disk_champ = load_saved_tier_models(models_dir=models_dir, device=device)
-        tier_models = disk_models
-        models_dict = models_dict or disk_dict
-        champion_tier = champion_tier or disk_champ
-
-    tier_models = tier_models or {}
-    models_dict = models_dict or {}
+    disk_models, disk_dict, disk_champ = load_saved_tier_models(models_dir=models_dir, device=device)
+    tier_models = {**disk_models, **(tier_models or {})}
+    models_dict = {**disk_dict, **(models_dict or {})}
+    champion_tier = champion_tier or disk_champ
 
     opts = list(tier_models.keys())
     if not opts and Path("models/champion_config.json").exists():
@@ -203,9 +203,12 @@ def render_inference_widget(
                 if hasattr(m, "to"):
                     clf.model = m.to(device).eval()
                     clf.model_type = "pytorch"
-                else:
+                elif hasattr(m, "predict_proba"):
                     clf.model = m
                     clf.model_type = "sklearn"
+                else:
+                    clf.model = m
+                    clf.model_type = "lgbm_booster"
             elif Path("models/champion_config.json").exists():
                 clf = FireClassifier(
                     model_path="models/champion_model.pt",

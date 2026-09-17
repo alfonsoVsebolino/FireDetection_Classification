@@ -130,8 +130,8 @@ class FireClassifier:
         if self.model_type == "lgbm_booster":
             from src.features.extract import extract_all_features
             feat = extract_all_features(img).reshape(1, -1)
-            p_fire = float(self.model.predict(feat)[0])
-            return p_fire, 1.0 - p_fire
+            p_smoke = float(self.model.predict(feat)[0])
+            return 1.0 - p_smoke, p_smoke
 
         raise ValueError(f"Unknown model_type: {self.model_type}")
 
