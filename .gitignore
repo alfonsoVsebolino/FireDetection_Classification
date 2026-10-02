@@ -6,3 +6,4 @@
 !docs/**
 !issues/**
 Data_Preprocessed.zip
+__pycache__/
