@@ -219,3 +219,19 @@ def test_src_ui_exports():
     assert hasattr(ui_pkg, "launch_ui")
     assert hasattr(ui_pkg, "load_saved_tier_models")
     assert hasattr(ui_pkg, "render_inference_widget")
+
+
+def test_notebook_section_10_launches_gradio_ui():
+    """Verify notebook Section 10 cell imports and launches Gradio UI with hot-started models."""
+    nb_path = Path("training_and_evaluation.ipynb")
+    assert nb_path.exists()
+    with open(nb_path, encoding="utf-8") as f:
+        nb = json.load(f)
+
+    # Section 10 is cell 23
+    sec10_code = "".join(nb["cells"][23]["source"])
+    assert "from src.ui.app import launch_ui" in sec10_code
+    assert "launch_ui(" in sec10_code
+    assert "models_dir = \"src/models/models_reproduce\"" in sec10_code
+    assert "share=True" in sec10_code
+
