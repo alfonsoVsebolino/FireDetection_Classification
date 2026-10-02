@@ -2,4 +2,7 @@
 /.agents
 /Data_Preprocessed
 *.md
+!AGENTS.md
+!docs/**
+!issues/**
 Data_Preprocessed.zip
