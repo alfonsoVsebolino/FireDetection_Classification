@@ -74,9 +74,10 @@ def test_evaluate_all_tiers_device_sync(tmp_path):
     mock_vit.parameters.return_value = iter([torch.zeros(1)])
     mock_vit.return_value = torch.tensor([[1.0, 0.0]])
 
-    dummy_tensor = torch.zeros(3, 224, 224)
-    mock_loader = [([dummy_tensor], torch.tensor([0]))]
-    mock_loader.dataset = [(dummy_tensor, 0, "dummy.jpg")]
+    dummy_tensor = torch.zeros(1, 3, 224, 224)
+    mock_loader = MagicMock()
+    mock_loader.__iter__.return_value = [(dummy_tensor, torch.tensor([0]))]
+    mock_loader.dataset = [(dummy_tensor[0], 0, "dummy.jpg")]
     X_test = np.zeros((1, 10))
     y_test = np.array([0])
     target_dev = torch.device("cpu")
