@@ -462,7 +462,6 @@ class FireSmokeDataset(Dataset):
         if is_eval and self.filter_duplicates and self.cross_split_dedup:
             train_index = _get_train_hash_index(self.root_dir, split_dir)
             
-            label = _parse_label(lbl_file)
 
         for p in image_paths:
             if detect_corrupted(p):
