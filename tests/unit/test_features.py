@@ -76,3 +76,13 @@ def test_train_lightgbm_smoke():
     probs = model.predict_proba(X_val)
     assert probs.shape == (10, 2)
     assert np.allclose(probs.sum(axis=1), 1.0, atol=1e-5)
+
+
+def test_extract_features_dataset(synthetic_rgb_image):
+    """Verify extract_features_dataset works with dataset and loader."""
+    from src.features.extract import extract_features_dataset
+    dataset = [(synthetic_rgb_image, 0), (synthetic_rgb_image, 1)]
+    feats, labels = extract_features_dataset(dataset)
+    assert feats.shape == (2, 134)
+    assert (labels == np.array([0, 1])).all()
+

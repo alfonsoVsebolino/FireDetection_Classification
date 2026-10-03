@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Union
+from typing import Any, Optional, Tuple, Union
 import cv2
 import numpy as np
 from PIL import Image
@@ -113,3 +113,14 @@ def extract_all_features(img: Union[Image.Image, np.ndarray]) -> np.ndarray:
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     texture = extract_texture_features(gray)
     return np.concatenate([hist, moments, texture]).astype(np.float32)
+
+
+def extract_features_dataset(
+    dataset_or_loader: Any,
+    max_samples: Optional[int] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    dataset = getattr(dataset_or_loader, "dataset", dataset_or_loader)
+    from src.models.train_lightgbm import extract_features_from_dataset
+
+    return extract_features_from_dataset(dataset, max_samples=max_samples)
+
