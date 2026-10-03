@@ -98,3 +98,54 @@ def test_inference_cli_interface(synthetic_fire_image, temp_image_dir):
         with open(output_json, "r") as f:
             data = json.load(f)
             assert "hazard_detected" in data or isinstance(data, list)
+
+
+def test_fire_classifier_predict_alias_identical(synthetic_fire_image):
+    FireClassifier = import_or_skip("src.inference", "FireClassifier")
+    classifier = FireClassifier(model_type="mock", model_path="", threshold=0.50, ambient_tau=0.70)
+    classifier.model = MockBackendModel([0.85, 0.15])
+
+    res_predict = classifier.predict(synthetic_fire_image)
+    res_predict_image = classifier.predict_image(synthetic_fire_image)
+
+    res_predict_no_lat = {k: v for k, v in res_predict.items() if k != "latency_ms"}
+    res_predict_image_no_lat = {k: v for k, v in res_predict_image.items() if k != "latency_ms"}
+
+    assert res_predict_no_lat == res_predict_image_no_lat
+    assert classifier.predict.__func__ is classifier.predict_image.__func__
+
+    probs = classifier.get_probs(synthetic_fire_image)
+    assert pytest.approx(probs[0], abs=1e-4) == 0.85
+    assert pytest.approx(probs[1], abs=1e-4) == 0.15
+
+    # Positional model_path backward compatibility
+    clf_pos = FireClassifier("src/models/models_reproduce/champion_model.pt")
+    assert clf_pos.model is not None
+
+
+def test_fire_classifier_sha256_integrity_validation(tmp_path):
+    FireClassifier = import_or_skip("src.inference", "FireClassifier")
+
+    # Genuine weights verification passes
+    clf = FireClassifier(config_path="src/models/models_reproduce/champion_config.json")
+    assert clf.model is not None
+
+    # Tampered weights raise ValueError with exact contract message
+    tampered_weights = tmp_path / "tampered_champion_model.pt"
+    tampered_weights.write_bytes(b"corrupted_weights_content")
+
+    cfg_tampered = tmp_path / "tampered_config.json"
+    expected_sha = "10050e26de1cf71e10e13d6af35172aea5d49b3a483c751e7db5fd2c2e312136"
+    cfg_tampered.write_text(json.dumps({
+        "model_path": str(tampered_weights),
+        "model_sha256": expected_sha,
+        "calibrated_threshold": 0.46,
+        "ambient_tau": 0.70,
+        "architecture": "deit_tiny_patch16_224",
+    }))
+
+    with pytest.raises(ValueError) as exc_info:
+        FireClassifier(config_path=str(cfg_tampered))
+
+    assert f"Model integrity verification failed: expected {expected_sha}" in str(exc_info.value)
+

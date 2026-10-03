@@ -7,6 +7,7 @@ CLI usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -61,13 +62,20 @@ class FireClassifier:
 
     def __init__(
         self,
+        model_type: str = "auto",
         model_path: str = "",
         config_path: str = "",
         threshold: Optional[float] = None,
         ambient_tau: Optional[float] = None,
         device: str = "cpu",
-        model_type: str = "pytorch",
     ) -> None:
+        known_types = {"auto", "pytorch", "mock", "stub", "lgbm", "sklearn", "lgbm_booster"}
+        if isinstance(model_type, Path) or (isinstance(model_type, str) and model_type not in known_types):
+            actual_config_path = config_path if config_path else model_path
+            model_path = str(model_type)
+            config_path = actual_config_path
+            model_type = "auto"
+
         self.threshold = 0.50 if threshold is None else threshold
         self.ambient_tau = 0.70 if ambient_tau is None else ambient_tau
         self.device = torch.device(device)
@@ -87,6 +95,9 @@ class FireClassifier:
             if model_path or config_path:
                 self._load_model(model_path, config_path)
 
+        if self.model_type == "auto":
+            self.model_type = "pytorch"
+
         if threshold is not None:
             self.threshold = threshold
         if ambient_tau is not None:
@@ -94,6 +105,7 @@ class FireClassifier:
 
     def _load_model(self, model_path: str, config_path: str) -> None:
         architecture = None
+        expected_sha = None
         if config_path:
             cp = Path(config_path)
             if not cp.exists():
@@ -114,6 +126,7 @@ class FireClassifier:
                 if "ambient_tau" in cfg:
                     self.ambient_tau = float(cfg["ambient_tau"])
                 architecture = cfg.get("architecture")
+                expected_sha = cfg.get("model_sha256")
                 if not model_path:
                     model_path = cfg.get("model_path", "")
 
@@ -134,6 +147,14 @@ class FireClassifier:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
         if p.suffix in (".pt", ".pth"):
+            if expected_sha:
+                with open(p, "rb") as f:
+                    actual_sha = hashlib.sha256(f.read()).hexdigest()
+                if actual_sha != expected_sha:
+                    raise ValueError(
+                        f"Model integrity verification failed: expected {expected_sha}, got {actual_sha}"
+                    )
+
             state_dict = torch.load(str(p), map_location=self.device)
             if isinstance(state_dict, dict) and "state_dict" in state_dict:
                 state_dict = state_dict["state_dict"]
@@ -202,6 +223,11 @@ class FireClassifier:
             return 1.0 - p_smoke, p_smoke
 
         raise ValueError(f"Unknown model_type: {self.model_type}")
+
+    def get_probs(self, image: Image.Image) -> tuple[float, float]:
+        """Return (p_fire, p_smoke)."""
+        img = image if isinstance(image, Image.Image) else _load_image(image)
+        return self._get_probs(img)
 
     def predict_image(
         self,
