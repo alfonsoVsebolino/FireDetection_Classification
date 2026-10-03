@@ -20,6 +20,10 @@ from PIL import Image
 
 from src.inference import FireClassifier
 
+if not hasattr(FireClassifier, "get_probs") and hasattr(FireClassifier, "_get_probs"):
+    FireClassifier.get_probs = FireClassifier._get_probs
+
+
 THEMES: Dict[str, Dict[str, str]] = {
     "fire": {"bg": "#cf1322", "fg": "#ffffff", "icon": "🔥", "label": "FIRE DETECTED"},
     "smoke": {"bg": "#d46b08", "fg": "#ffffff", "icon": "💨", "label": "SMOKE DETECTED"},
@@ -186,37 +190,22 @@ class ModelRegistry:
 
         clf: Optional[FireClassifier] = None
 
-        if "Champion" in tier_name:
-            m_path = mdir / "champion_model.pt"
-            if not m_path.exists() and (mdir / "tier3_deit_tiny_best.pt").exists():
-                m_path = mdir / "tier3_deit_tiny_best.pt"
-            if m_path.exists() or cfg_p.exists():
+        dispatch_map = {
+            "Champion": (["champion_model.pt", "tier3_deit_tiny_best.pt"], True),
+            "LightGBM": (["tier1_lightgbm.txt", "tier1_lightgbm.pkl", "tier1_lightgbm.joblib"], False),
+            "ResNet18": (["tier2_resnet18_best.pt"], False),
+            "DeiT": (["tier3_deit_tiny_best.pt", "champion_model.pt"], True),
+            "Tier3": (["tier3_deit_tiny_best.pt", "champion_model.pt"], True),
+        }
+        spec = next((v for k, v in dispatch_map.items() if k in tier_name), None)
+        if spec:
+            candidates, use_cfg = spec
+            m_path = next((mdir / f for f in candidates if (mdir / f).exists()), None)
+            cfg_arg = str(cfg_p) if use_cfg and cfg_p.exists() else ""
+            if m_path or cfg_arg:
                 clf = FireClassifier(
-                    model_path=str(m_path) if m_path.exists() else "",
-                    config_path=str(cfg_p) if cfg_p.exists() else "",
-                    device=self.device,
-                )
-        elif "LightGBM" in tier_name:
-            for p_lgb in [
-                mdir / "tier1_lightgbm.txt",
-                mdir / "tier1_lightgbm.pkl",
-                mdir / "tier1_lightgbm.joblib",
-            ]:
-                if p_lgb.exists():
-                    clf = FireClassifier(model_path=str(p_lgb), device=self.device)
-                    break
-        elif "ResNet18" in tier_name:
-            m_path = mdir / "tier2_resnet18_best.pt"
-            if m_path.exists():
-                clf = FireClassifier(model_path=str(m_path), device=self.device)
-        elif "DeiT" in tier_name or "Tier3" in tier_name:
-            m_path = mdir / "tier3_deit_tiny_best.pt"
-            if not m_path.exists() and (mdir / "champion_model.pt").exists():
-                m_path = mdir / "champion_model.pt"
-            if m_path.exists() or cfg_p.exists():
-                clf = FireClassifier(
-                    model_path=str(m_path) if m_path.exists() else "",
-                    config_path=str(cfg_p) if cfg_p.exists() else "",
+                    model_path=str(m_path) if m_path else "",
+                    config_path=cfg_arg,
                     device=self.device,
                 )
 
@@ -280,6 +269,8 @@ def build_app(
     default_model = unique_choices[0]
     default_theta = get_model_calibrated_threshold(default_model, thresholds)
     default_tau = 0.70
+    champ_name = champ_key.replace("Champion (", "").rstrip(")") if "Champion (" in champ_key else champ_key
+    champ_theta = thresholds.get(champ_key, thresholds.get(champ_name, 0.46))
 
     with gr.Blocks(title="Fire & Smoke Dual-Gate Inference Dashboard") as demo:
         gr.HTML(
@@ -288,7 +279,7 @@ def build_app(
             "</style>"
         )
         gr.Markdown(
-            "# 🔥 Fire & Smoke Hazard Detection System\n"
+            f"### 🔥 Fire & Smoke Early Detection System | 🖥️ Device: `{str(device).upper()}` | 🏆 Champion: `{champ_name}` (θ* = {champ_theta:.2f})\n"
             "### Dual-Gate Calibrated Operational Inference Window\n"
             "Gate 1: Ambient Rejection ($\\tau$) | Gate 2: Calibrated Hazard Detection ($\\theta^*$)"
         )
@@ -407,7 +398,7 @@ def build_app(
             target_img = target_img.convert("RGB")
             t0 = time.perf_counter()
             clf = registry.get_classifier(model_name)
-            p_fire, p_smoke = clf._get_probs(target_img)
+            p_fire, p_smoke = clf.get_probs(target_img)
             latency_ms = (time.perf_counter() - t0) * 1000.0
 
             res = apply_dual_gating(p_fire, p_smoke, theta, tau, latency_ms=latency_ms)

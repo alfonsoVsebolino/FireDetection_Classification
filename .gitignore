@@ -2,6 +2,7 @@
 /.agents
 /Data_Preprocessed
 *.md
+!PROJECT.md
 AGENTS.md
 !docs/**
 issues/**
