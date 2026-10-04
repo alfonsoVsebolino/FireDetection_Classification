@@ -3,6 +3,7 @@
 /Data_Preprocessed
 *.md
 !PROJECT.md
+!README.md
 AGENTS.md
 !docs/**
 issues/**

@@ -1,0 +1,28 @@
+# Core ML & Numerical
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+
+# Deep Learning & Vision Backbones
+torch>=2.0.0
+torchvision>=0.15.0
+timm>=0.9.0
+
+# Classical Model & Feature Extraction
+lightgbm>=4.0.0
+Pillow>=9.5.0
+imagehash>=4.3.1
+
+# Data Ingestion & HuggingFace Ecosystem
+datasets>=2.14.0
+huggingface_hub>=0.16.0
+
+# Visualizations & Interactive UI
+matplotlib>=3.7.0
+ipywidgets>=8.0.0
+jupyter>=1.0.0
+ipykernel>=6.20.0
+gradio>=4.0.0
+
+# Verification & Quality Assurance
+pytest>=7.4.0
