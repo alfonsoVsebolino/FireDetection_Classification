@@ -1,0 +1,21 @@
+{
+  "champion_tier": "Tier3_DeiT_Tiny",
+  "champion_recall_fire": 0.92,
+  "champion_latency_ms": 35.40210687999888,
+  "all_tiers": {
+    "Tier2_ResNet18": {
+      "test_recall_fire": 0.95,
+      "latency_ms": 55.446032099998774,
+      "qualified": true
+    },
+    "Tier3_DeiT_Tiny": {
+      "test_recall_fire": 0.92,
+      "latency_ms": 35.40210687999888,
+      "qualified": true
+    }
+  },
+  "model_path": "models/champion_model.pt",
+  "model_sha256": "10050e26de1cf71e10e13d6af35172aea5d49b3a483c751e7db5fd2c2e312136",
+  "calibrated_threshold": 0.4600000000000001,
+  "architecture": "deit_tiny_patch16_224"
+}

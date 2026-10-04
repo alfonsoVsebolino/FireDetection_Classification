@@ -1,0 +1,127 @@
+{
+  "Tier1_LightGBM": {
+    "theta_calibrated": 0.30000000000000004,
+    "metrics_default_050": {
+      "fire_recall": 0.8448687350835322,
+      "fire_precision": 0.9076923076923077,
+      "accuracy": 0.8083491461100569,
+      "fire_f1": 0.8751545117428925,
+      "confusion_matrix": [
+        [
+          354,
+          65
+        ],
+        [
+          36,
+          72
+        ]
+      ]
+    },
+    "metrics_calibrated": {
+      "fire_recall": 0.9260143198090692,
+      "fire_precision": 0.8778280542986425,
+      "accuracy": 0.8387096774193549,
+      "fire_f1": 0.9012775842044135,
+      "confusion_matrix": [
+        [
+          388,
+          31
+        ],
+        [
+          54,
+          54
+        ]
+      ]
+    },
+    "latency_cpu_ms": {
+      "mean_ms": 1.3291966774256616,
+      "median_ms": 1.2364869999146322,
+      "p95_ms": 1.3956214999325312
+    },
+    "latency_cpu_e2e_ms": {
+      "mean_ms": 44.84477778366784,
+      "median_ms": 42.007894000107626,
+      "p95_ms": 66.04292009978963
+    }
+  },
+  "Tier2_ResNet18": {
+    "theta_calibrated": 0.54,
+    "metrics_default_050": {
+      "fire_recall": 0.9260143198090692,
+      "fire_precision": 0.8899082568807339,
+      "accuracy": 0.8500948766603416,
+      "fire_f1": 0.9076023391812865,
+      "confusion_matrix": [
+        [
+          388,
+          31
+        ],
+        [
+          48,
+          60
+        ]
+      ]
+    },
+    "metrics_calibrated": {
+      "fire_recall": 0.9164677804295943,
+      "fire_precision": 0.8930232558139535,
+      "accuracy": 0.8462998102466793,
+      "fire_f1": 0.9045936395759717,
+      "confusion_matrix": [
+        [
+          384,
+          35
+        ],
+        [
+          46,
+          62
+        ]
+      ]
+    },
+    "latency_cpu_ms": {
+      "mean_ms": 63.779696244783146,
+      "median_ms": 58.19596100036506,
+      "p95_ms": 85.5527772998812
+    }
+  },
+  "Tier3_DeiT_Tiny": {
+    "theta_calibrated": 0.4600000000000001,
+    "metrics_default_050": {
+      "fire_recall": 0.9140811455847255,
+      "fire_precision": 0.8906976744186047,
+      "accuracy": 0.8425047438330171,
+      "fire_f1": 0.9022379269729093,
+      "confusion_matrix": [
+        [
+          383,
+          36
+        ],
+        [
+          47,
+          61
+        ]
+      ]
+    },
+    "metrics_calibrated": {
+      "fire_recall": 0.918854415274463,
+      "fire_precision": 0.8912037037037037,
+      "accuracy": 0.8462998102466793,
+      "fire_f1": 0.9048178613396005,
+      "confusion_matrix": [
+        [
+          385,
+          34
+        ],
+        [
+          47,
+          61
+        ]
+      ]
+    },
+    "latency_cpu_ms": {
+      "mean_ms": 41.669589011382634,
+      "median_ms": 37.36399199988227,
+      "p95_ms": 57.943255999816756
+    }
+  }
+}

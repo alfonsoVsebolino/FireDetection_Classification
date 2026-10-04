@@ -91,25 +91,45 @@ def load_saved_tier_models(
 ) -> tuple[Dict[str, Any], Dict[str, Any], str]:
     """Scan disk/Drive checkpoints and reconstruct evaluation-ready model dictionary."""
     mdir = Path(models_dir)
+    reproduce_dir = Path("src/models/models_reproduce")
     drive_dir = Path("/content/drive/MyDrive/FireDetection_Classification_Outputs/models")
-    if not mdir.exists() and drive_dir.exists():
-        mdir = drive_dir
+    if not mdir.exists():
+        if reproduce_dir.exists():
+            mdir = reproduce_dir
+        elif drive_dir.exists():
+            mdir = drive_dir
 
     tier_models: Dict[str, Any] = {}
     models_dict: Dict[str, Any] = {}
     champion_tier = "Tier2_ResNet18"
+
+    bench_path = mdir / "test_benchmark_tiers.json"
+    if bench_path.exists():
+        try:
+            with open(bench_path) as f:
+                bench = json.load(f)
+            for tier_name, tier_info in bench.items():
+                if tier_name not in models_dict:
+                    models_dict[tier_name] = {}
+                if "theta_calibrated" in tier_info:
+                    models_dict[tier_name]["calibrated_threshold"] = tier_info["theta_calibrated"]
+        except Exception:
+            pass
 
     cfg_path = mdir / "champion_config.json"
     if cfg_path.exists():
         with open(cfg_path) as f:
             cfg = json.load(f)
         champion_tier = cfg.get("champion_tier", champion_tier)
-        models_dict = cfg.get("models_dict", {})
-        if not models_dict:
-            models_dict[champion_tier] = {
-                "calibrated_threshold": cfg.get("calibrated_threshold", 0.50),
-                "ambient_tau": cfg.get("ambient_tau", 0.70),
-            }
+        cfg_models_dict = cfg.get("models_dict", {})
+        if cfg_models_dict:
+            models_dict.update(cfg_models_dict)
+        if champion_tier not in models_dict:
+            models_dict[champion_tier] = {}
+        if "calibrated_threshold" in cfg:
+            models_dict[champion_tier]["calibrated_threshold"] = cfg["calibrated_threshold"]
+        if "ambient_tau" in cfg:
+            models_dict[champion_tier]["ambient_tau"] = cfg.get("ambient_tau", 0.70)
 
     import torch
 
@@ -134,8 +154,12 @@ def load_saved_tier_models(
     for p_lgb in [mdir / "tier1_lightgbm.txt", mdir / "tier1_lightgbm.pkl", mdir / "tier1_lightgbm.joblib"]:
         if p_lgb.exists():
             if p_lgb.suffix == ".txt":
-                import lightgbm as lgb
-                tier_models["Tier1_LightGBM"] = lgb.Booster(model_file=str(p_lgb))
+                try:
+                    from src.models.train_lightgbm import load_model
+                    tier_models["Tier1_LightGBM"] = load_model(str(p_lgb))
+                except Exception:
+                    import lightgbm as lgb
+                    tier_models["Tier1_LightGBM"] = lgb.Booster(model_file=str(p_lgb))
             else:
                 import joblib
                 tier_models["Tier1_LightGBM"] = joblib.load(str(p_lgb))

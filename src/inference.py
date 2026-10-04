@@ -7,6 +7,7 @@ CLI usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -61,48 +62,136 @@ class FireClassifier:
 
     def __init__(
         self,
+        model_type: str = "auto",
         model_path: str = "",
         config_path: str = "",
-        threshold: float = 0.50,
-        ambient_tau: float = 0.70,
+        threshold: Optional[float] = None,
+        ambient_tau: Optional[float] = None,
         device: str = "cpu",
-        model_type: str = "pytorch",
     ) -> None:
-        self.threshold = threshold
-        self.ambient_tau = ambient_tau
+        known_types = {"auto", "pytorch", "mock", "stub", "lgbm", "sklearn", "lgbm_booster"}
+        if isinstance(model_type, Path) or (isinstance(model_type, str) and model_type not in known_types):
+            actual_config_path = config_path if config_path else model_path
+            model_path = str(model_type)
+            config_path = actual_config_path
+            model_type = "auto"
+
+        self.threshold = 0.50 if threshold is None else threshold
+        self.ambient_tau = 0.70 if ambient_tau is None else ambient_tau
         self.device = torch.device(device)
         self.model_type = model_type
         self.model: Any = None
 
-        if model_path and Path(model_path).exists():
-            self._load_model(model_path, config_path)
+        if model_type not in ("mock", "stub"):
+            if not model_path and not config_path:
+                for cand in [
+                    Path("src/models/models_reproduce/champion_config.json"),
+                    Path("models/champion_config.json"),
+                ]:
+                    if cand.exists():
+                        config_path = str(cand)
+                        break
+
+            if model_path or config_path:
+                self._load_model(model_path, config_path)
+
+        if self.model_type == "auto":
+            self.model_type = "pytorch"
+
+        if threshold is not None:
+            self.threshold = threshold
+        if ambient_tau is not None:
+            self.ambient_tau = ambient_tau
 
     def _load_model(self, model_path: str, config_path: str) -> None:
+        architecture = None
+        expected_sha = None
+        if config_path:
+            cp = Path(config_path)
+            if not cp.exists():
+                for cdir in [Path("src/models/models_reproduce"), Path("models")]:
+                    if (cdir / cp.name).exists():
+                        cp = cdir / cp.name
+                        break
+                    if (cdir / cp).exists():
+                        cp = cdir / cp
+                        break
+            if cp.exists():
+                with open(cp) as f:
+                    cfg = json.load(f)
+                if "calibrated_threshold" in cfg:
+                    self.threshold = float(cfg["calibrated_threshold"])
+                elif "threshold" in cfg:
+                    self.threshold = float(cfg["threshold"])
+                if "ambient_tau" in cfg:
+                    self.ambient_tau = float(cfg["ambient_tau"])
+                architecture = cfg.get("architecture")
+                expected_sha = cfg.get("model_sha256")
+                if not model_path:
+                    model_path = cfg.get("model_path", "")
+
+        if not model_path:
+            return
+
         p = Path(model_path)
+        if not p.exists():
+            for cdir in [Path("src/models/models_reproduce"), Path("models")]:
+                if (cdir / p.name).exists():
+                    p = cdir / p.name
+                    break
+                if (cdir / p).exists():
+                    p = cdir / p
+                    break
+
+        if not p.exists():
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+
         if p.suffix in (".pt", ".pth"):
-            # Lazy import to avoid hard dep when testing with mock
-            from torchvision import models
-            from torchvision.models import ResNet18_Weights
-            m = models.resnet18(weights=None)
-            m.fc = nn.Sequential(nn.Dropout(0.3), nn.Linear(512, 2))
-            m.load_state_dict(torch.load(str(p), map_location=self.device))
+            if expected_sha:
+                with open(p, "rb") as f:
+                    actual_sha = hashlib.sha256(f.read()).hexdigest()
+                if actual_sha != expected_sha:
+                    raise ValueError(
+                        f"Model integrity verification failed: expected {expected_sha}, got {actual_sha}"
+                    )
+
+            state_dict = torch.load(str(p), map_location=self.device)
+            if isinstance(state_dict, dict) and "state_dict" in state_dict:
+                state_dict = state_dict["state_dict"]
+            elif isinstance(state_dict, dict) and "model" in state_dict:
+                state_dict = state_dict["model"]
+
+            if architecture:
+                arch_lower = architecture.lower()
+                if "deit" in arch_lower or "vit" in arch_lower:
+                    from src.models.train_vit import build_deit_tiny
+                    m = build_deit_tiny(pretrained=False, num_classes=2)
+                else:
+                    from src.models.train_resnet import build_resnet18
+                    m = build_resnet18(pretrained=False, num_classes=2)
+            else:
+                keys = list(state_dict.keys()) if isinstance(state_dict, dict) else []
+                if any("patch_embed" in k or "blocks." in k for k in keys):
+                    from src.models.train_vit import build_deit_tiny
+                    m = build_deit_tiny(pretrained=False, num_classes=2)
+                else:
+                    from src.models.train_resnet import build_resnet18
+                    m = build_resnet18(pretrained=False, num_classes=2)
+
+            m.load_state_dict(state_dict)
             m.to(self.device).eval()
             self.model = m
             self.model_type = "pytorch"
+
+        elif p.suffix == ".txt":
+            from src.models.train_lightgbm import load_model
+            self.model = load_model(str(p))
+            self.model_type = "lgbm"
+
         elif p.suffix in (".pkl", ".joblib"):
             import joblib
             self.model = joblib.load(str(p))
             self.model_type = "sklearn"
-        elif p.suffix == ".txt":
-            import lightgbm as lgb
-            self.model = lgb.Booster(model_file=str(p))
-            self.model_type = "lgbm_booster"
-
-        if config_path and Path(config_path).exists():
-            with open(config_path) as f:
-                cfg = json.load(f)
-            self.threshold = cfg.get("threshold", self.threshold)
-            self.ambient_tau = cfg.get("ambient_tau", self.ambient_tau)
 
     def _get_probs(self, img: Image.Image) -> tuple[float, float]:
         """Return (p_fire, p_smoke)."""
@@ -134,6 +223,11 @@ class FireClassifier:
             return 1.0 - p_smoke, p_smoke
 
         raise ValueError(f"Unknown model_type: {self.model_type}")
+
+    def get_probs(self, image: Image.Image) -> tuple[float, float]:
+        """Return (p_fire, p_smoke)."""
+        img = image if isinstance(image, Image.Image) else _load_image(image)
+        return self._get_probs(img)
 
     def predict_image(
         self,
@@ -215,8 +309,8 @@ def main() -> None:
     parser.add_argument("--input", required=True, help="Path to image file or directory")
     parser.add_argument("--model-path", default="", help="Path to champion model artifact")
     parser.add_argument("--config-path", default="", help="Path to champion_config.json")
-    parser.add_argument("--threshold", type=float, default=0.50, help="Fire detection threshold θ*")
-    parser.add_argument("--ambient-tau", type=float, default=0.70, help="Ambient rejection gate τ")
+    parser.add_argument("--threshold", type=float, default=None, help="Fire detection threshold θ*")
+    parser.add_argument("--ambient-tau", type=float, default=None, help="Ambient rejection gate τ")
     parser.add_argument("--output-json", default=None, help="Write results to JSON file")
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
